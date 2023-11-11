@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?><record_update table="sys_extension_point">
+    <sys_extension_point action="INSERT_OR_UPDATE">
+        <api_name>x_376096_us_exp.USExpExt</api_name>
+        <description/>
+        <example><![CDATA[/* global global, gs, SNC */
+/* global Class, GlideRecordSecure */
+/* eslint no-undef: "error" */
+var USExpExt = Class.create();
+USExpExt.prototype = {
+    initialize: function() {
+		
+    },
+
+    hasUpgradeDetails: function (metaDataGr) {
+		if (['rhino.global', 'global'].indexOf(gs.getCurrentScopeName()) != -1) {
+			var upgradeLogGr = new GlideRecordSecure('sys_upgrade_history_log');
+			upgradeLogGr.addQuery('file_name', metaDataGr.sys_update_name);
+			upgradeLogGr.setLimit(1);
+			upgradeLogGr.query();
+			return upgradeLogGr.hasNext();
+		} else {		
+			throw new Error('Global Scope Implementation for hasUpgradeDetails required');
+		}
+	},
+	
+	getLatestUpgradeDetailSysID: function (updateName) {
+		if (['rhino.global', 'global'].indexOf(gs.getCurrentScopeName()) != -1) {
+			var upgradeLogGr = new GlideRecordSecure('sys_upgrade_history_log');
+			upgradeLogGr.addQuery('file_name', updateName);
+			upgradeLogGr.orderByDesc('sys_created_on');
+			upgradeLogGr.setLimit(1);
+			upgradeLogGr.query();
+			if (upgradeLogGr.next()) {
+				return upgradeLogGr.getUniqueValue();
+			}
+
+			return '';
+		} else {		
+			throw new Error('Global Scope Implementation for getLatestUpgradeDetailSysID required');
+		}
+	},
+	
+	exportUpdateSet: function (updateSetGr) {
+		if (['rhino.global', 'global'].indexOf(gs.getCurrentScopeName()) != -1) {
+			return new global.UpdateSetExport().exportUpdateSet(updateSetGr, baseUpdateSetId, parentId);
+		} else {
+			throw new Error('Global Scope Implementation for exportUpdateSet required');
+		}
+	},
+	
+	deleteRemoteUpdateSet: function (remoteUpdateSetSysId) {
+		if (['rhino.global', 'global'].indexOf(gs.getCurrentScopeName()) != -1) {
+			var remoteUpdateSetGr = new GlideRecordSecure('sys_remote_update_set');
+			remoteUpdateSetGr.addQuery('sys_id', remoteUpdateSetSysId);
+			remoteUpdateSetGr.setLimit(1);
+			remoteUpdateSetGr.query();
+			if (remoteUpdateSetGr.next()) {
+				// sys_update_xml are cascade-deleted
+				remoteUpdateSetGr.deleteRecord();
+			}
+		} else {		
+			throw new Error('Global Scope Implementation for deleteRemoteUpdateSet required');
+		}
+	},
+	
+	cancelExecutionTracker: function (trackerId, message) {
+		if (['rhino.global', 'global'].indexOf(gs.getCurrentScopeName()) != -1) {
+			var tracker = SNC.GlideExecutionTracker.getBySysID(trackerId);
+			if (message) {
+				tracker.cancel(message);
+			} else {
+				tracker.cancel();
+			}
+		} else {
+			throw new Error('Global Scope Implementation for deleteRemoteUpdateSet required');
+		}
+	},
+
+    type: 'USExpExt'
+};]]></example>
+        <name>USExpExt</name>
+        <restrict_scope>false</restrict_scope>
+        <sys_class_name>sys_extension_point</sys_class_name>
+        <sys_created_by>admin</sys_created_by>
+        <sys_created_on>2023-11-11 10:33:12</sys_created_on>
+        <sys_id>8393cfbf979ab1103c2d3f56f053af58</sys_id>
+        <sys_mod_count>2</sys_mod_count>
+        <sys_name>USExpExt</sys_name>
+        <sys_package display_value="Update Set Export" source="x_376096_us_exp">febd5633971ab1103c2d3f56f053af79</sys_package>
+        <sys_policy/>
+        <sys_scope display_value="Update Set Export">febd5633971ab1103c2d3f56f053af79</sys_scope>
+        <sys_update_name>sys_extension_point_8393cfbf979ab1103c2d3f56f053af58</sys_update_name>
+        <sys_updated_by>admin</sys_updated_by>
+        <sys_updated_on>2023-11-11 11:42:57</sys_updated_on>
+    </sys_extension_point>
+</record_update>

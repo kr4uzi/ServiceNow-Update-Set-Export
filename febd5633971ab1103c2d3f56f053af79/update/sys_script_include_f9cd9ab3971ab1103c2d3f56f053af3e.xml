@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?><record_update table="sys_script_include">
+    <sys_script_include action="INSERT_OR_UPDATE">
+        <access>package_private</access>
+        <active>true</active>
+        <api_name>x_376096_us_exp.USExpUtilClient</api_name>
+        <caller_access/>
+        <client_callable>true</client_callable>
+        <description/>
+        <name>USExpUtilClient</name>
+        <script><![CDATA[/* global global, gs */
+/* global Class, GlideRecordSecure, GlideScriptedExtensionPoint */
+/* eslint no-undef: "error" */
+var USExpUtilClient = Class.create();
+USExpUtilClient.prototype = Object.extendsObject(global.AbstractAjaxProcessor, {
+	
+	initialize: function(request, responseXML, gc) {
+		global.AbstractAjaxProcessor.prototype.initialize.apply(this, arguments);
+	},
+	
+	createRemoteUpdateSet: function () {
+		const result = {
+			status: 'error',
+			message: ''
+		};
+		
+		const updateSet = this.getParameter('update_set');
+		if (updateSet) {
+			const extensionPoints = new GlideScriptedExtensionPoint().getExtensions('USExpExt');
+			if (extensionPoints.length) {
+				const updateSetGr = new GlideRecordSecure('sys_update_set');
+				updateSetGr.addQuery('sys_id', updateSet);
+				updateSetGr.setLimit(1);
+				updateSetGr.query();
+				if (updateSetGr.next()) {
+					// always use the extension point with the lowest order
+					const ext = extensionPoints[0];
+					ext.initialize();
+					result.remote_sys_id = ext.exportUpdateSet(updateSetGr);
+					result.status = 'success';
+				} else {
+					result.message = gs.getMessage('us_exp_unauthorized_or_invalid_record');
+				}
+			} else {
+				result.message = gs.getMessage('us_exp_no_ext_point');
+			}
+		} else {
+			result.message = gs.getMessage('us_exp_invalid_parameters');
+		}
+		
+		return JSON.stringify(result);
+	},
+
+    type: 'USExpUtilClient'
+});]]></script>
+        <sys_class_name>sys_script_include</sys_class_name>
+        <sys_created_by>admin</sys_created_by>
+        <sys_created_on>2023-11-11 10:35:36</sys_created_on>
+        <sys_id>f9cd9ab3971ab1103c2d3f56f053af3e</sys_id>
+        <sys_mod_count>6</sys_mod_count>
+        <sys_name>USExpUtilClient</sys_name>
+        <sys_package display_value="Update Set Export" source="x_376096_us_exp">febd5633971ab1103c2d3f56f053af79</sys_package>
+        <sys_policy/>
+        <sys_scope display_value="Update Set Export">febd5633971ab1103c2d3f56f053af79</sys_scope>
+        <sys_update_name>sys_script_include_f9cd9ab3971ab1103c2d3f56f053af3e</sys_update_name>
+        <sys_updated_by>admin</sys_updated_by>
+        <sys_updated_on>2023-11-11 13:21:57</sys_updated_on>
+    </sys_script_include>
+</record_update>

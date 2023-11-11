@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?><record_update table="sys_script_include">
+    <sys_script_include action="INSERT_OR_UPDATE">
+        <access>package_private</access>
+        <active>true</active>
+        <api_name>x_376096_us_exp.USExpExt</api_name>
+        <caller_access/>
+        <client_callable>false</client_callable>
+        <description>Implements extension point x_376096_us_exp.USExpExt</description>
+        <name>USExpExt</name>
+        <script><![CDATA[/* global Class, GlideRecord GlideScopedEvaluator */
+/* eslint no-undef: "error" */
+var USExpExt = Class.create();
+USExpExt.prototype = {
+    initialize: function() {
+		const scriptGr = new GlideRecord('sys_rte_eb_script_operation');
+		scriptGr.addQuery('sys_id', 'df5f83bf97dab1103c2d3f56f053afca');
+		scriptGr.setLimit(1);
+		scriptGr.query();
+		if (scriptGr.next()) {
+			this.script = scriptGr;
+		} else {
+			throw new Error('USExpExt failed to initialize');
+		}
+    },
+	
+	_execScript: function (scope, script, variables) {
+		this.script.sys_scope = 'global';
+		this.script.script = script;
+		var gse = GlideScopedEvaluator();
+		return gse.evaluateScript(this.script, 'script', variables);
+	},
+	
+	exportUpdateSet: function (updateSetGr) {
+		return this._execScript('global',
+			'new global.UpdateSetExport().exportUpdateSet(updateSetGr);',
+			{ updateSetGr: updateSetGr }
+		);
+	},
+	
+	deleteRemoteUpdateSet: function (remoteUpdateSetSysId) {
+		return this._execScript('global',
+			'var usGr = new GlideRecord("sys_remote_update_set");' +
+			'usGr.addQuery("sys_id", usSysId);' +
+			'usGr.setLimit(1);' +
+			'usGr.query();' +
+			'if (usGr.next()) {' +
+				// sys_update_xml are cascade-deleted
+				'usGr.deleteRecord();' +
+			'}', {
+				usSysId: remoteUpdateSetSysId
+			}
+		);
+	},
+	
+	cancelExecutionTracker: function (trackerId, message) {
+		return this._execScript('global',
+			'var tracker = SNC.GlideExecutionTracker.getBySysID(trackerId);' +
+			'if (message) {' +
+				'tracker.cancel(message);' +
+			'} else {' +
+				'tracker.cancel();' +
+			'}', {
+				trackerId: trackerId,
+				message: message
+			}
+		);
+	},
+
+    type: 'USExpExt'
+};]]></script>
+        <sys_class_name>sys_script_include</sys_class_name>
+        <sys_created_by>admin</sys_created_by>
+        <sys_created_on>2023-11-11 11:19:41</sys_created_on>
+        <sys_id>801f07bb97dab1103c2d3f56f053afa8</sys_id>
+        <sys_mod_count>2</sys_mod_count>
+        <sys_name>USExpExt</sys_name>
+        <sys_package display_value="Update Set Export" source="x_376096_us_exp">febd5633971ab1103c2d3f56f053af79</sys_package>
+        <sys_policy/>
+        <sys_scope display_value="Update Set Export">febd5633971ab1103c2d3f56f053af79</sys_scope>
+        <sys_update_name>sys_script_include_801f07bb97dab1103c2d3f56f053afa8</sys_update_name>
+        <sys_updated_by>admin</sys_updated_by>
+        <sys_updated_on>2023-11-11 11:43:14</sys_updated_on>
+    </sys_script_include>
+</record_update>

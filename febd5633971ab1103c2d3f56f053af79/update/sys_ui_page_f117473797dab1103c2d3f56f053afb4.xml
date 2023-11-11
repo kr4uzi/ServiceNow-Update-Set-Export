@@ -1,0 +1,286 @@
+<?xml version="1.0" encoding="UTF-8"?><record_update table="sys_ui_page">
+    <sys_ui_page action="INSERT_OR_UPDATE">
+        <category>general</category>
+        <client_script><![CDATA[/* global window, GlideAjax, JSZip, clientScriptData */
+/* eslint no-undef: "error" */
+function downloadUS(row) {
+	var loader = window.document.getElementById('us-export-loader');
+	loader.style.display = '';
+	
+	row.querySelectorAll('a').forEach(function (a) {
+		a.setAttribute('disabled', '');
+	});
+	
+	var errorElement = window.document.getElementById('us-export-error');
+	errorElement.style.display = 'none';
+	
+	createRemoteUpdateSet(row.dataset.sys_id)
+		.then(downloadRemoteUS, showErrorMessage)
+		['finally'](function () {
+			loader.style.display = 'none';
+			row.querySelectorAll('a').forEach(function (a) {
+				a.removeAttribute('disabled');
+			});
+		})
+	;
+	
+	function downloadRemoteUS(remoteUsSysId) {
+		var a = window.document.createElement('A');
+		a.href = remoteUSDownloadURL(remoteUsSysId);
+		a.click();
+	}
+	
+	function showErrorMessage(errorMessage) {
+		errorElement.style.display = '';
+		errorElement.innerHTML = errorMessage;
+	}
+}
+
+function downloadAll(element) {
+	// Credit to guest271314 for the ZIP download 
+	// https://stackoverflow.com/a/37176830
+	var usSysIds = [];
+	window.document.querySelectorAll('tbody tr[data-sys_id]').forEach(function (r) {
+		usSysIds.push({
+			sys_id: r.dataset.sys_id,
+			name: r.children[1].innerHTML
+		});
+	});
+	
+	var errorElement = window.document.getElementById('us-export-error');
+	errorElement.style.display = 'none';
+	
+	if (usSysIds.length) {
+		// show work/load indicators
+		var loader = window.document.getElementById('us-export-loader');
+		loader.style.display = '';
+		element.setAttribute('disabled', '');
+		
+		var zip = new JSZip();
+		window.Promise.all(usSysIds.map(function (updateSet) {
+			return new window.Promise(function(resolve, reject) {
+				createRemoteUpdateSet(updateSet.sys_id).then(function (remoteUsSysId) {
+					var req = new window.XMLHttpRequest();
+					req.open('GET', remoteUSDownloadURL(remoteUsSysId));						
+					req.setRequestHeader('X-UserToken', window.g_ck);
+					req.onload = function() {
+						var fileName = getFileName(updateSet, req);
+						zip.file(fileName, this.response);
+						resolve();
+					};
+					
+					req.responseType = 'blob';
+					req.send();
+				}, function (errorMessage) {
+					errorElement.innerHTML = errorMessage;
+					errorElement.style.display = '';
+					reject();
+				});
+			});
+		})).then(function() {
+			return zip.generateAsync({ type: 'blob' }).then(function(content) {
+				var a = window.document.createElement('A');
+				a.download = 
+					'Update Set Export - ' +
+					clientScriptData.instance_name +
+					' ' +
+					new Date().toLocaleDateString()
+				;
+				a.href = window.URL.createObjectURL(content);
+				a.click();
+				window.URL.revokeObjectURL(a.href);
+			});
+		})['finally'](function () {
+			loader.style.display = 'none';
+			element.removeAttribute('disabled');
+		});
+    }
+	
+	function getFileName(updateSet, request) {
+		var fileName = updateSet.name + '.xml';
+		var contentDisposition = request.getResponseHeader('Content-Disposition');
+		if (contentDisposition) {
+			var filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+			if (filenameMatch) {
+				fileName = filenameMatch[1];
+
+				if (fileName.startsWith('"') || fileName.startsWith('\'')) {
+					fileName = fileName.substring(1, fileName.length - 1);
+				}
+			}
+		}
+		
+		return fileName;
+	}
+}
+
+function createRemoteUpdateSet(updateSetSysId) {
+	return new window.Promise(function (resolve, reject) {
+		var ga = new GlideAjax('USExpUtilClient');
+		ga.addParam('sysparm_name', 'createRemoteUpdateSet');
+		ga.addParam('update_set', updateSetSysId);
+		ga.getXMLAnswer(function (result) {
+			result = JSON.parse(result);
+			if (result.status == 'success') {
+				resolve(result.remote_sys_id);
+			} else {
+				reject(result.message);
+			}
+		});
+	});
+}
+
+function remoteUSDownloadURL(removeUsSysId) {
+	return '/export_update_set.do' +
+		'?sysparm_sys_id=' + removeUsSysId +
+		'&sysparm_delete_when_done=true' +
+		'&sysparm_ck=' + window.g_ck
+	;
+}]]></client_script>
+        <description/>
+        <direct>false</direct>
+        <endpoint>x_376096_us_exp_batch_export.do</endpoint>
+        <html><![CDATA[<?xml version="1.0" encoding="utf-8" ?>
+<j:jelly trim="false" xmlns:j="jelly:core" xmlns:g="glide" xmlns:j2="null" xmlns:g2="null">
+	<g:requires name="x_424426_devops.jszip.min.js.jsdbx" />
+	<g:evaluate>
+		var usGr = new GlideRecordSecure('sys_update_set');
+		const labels = {
+			application: usGr.getElement('application').getLabel(),
+			name: usGr.getElement('name').getLabel(),
+			updateCount: gs.getMessage('us_exp_update_count'),
+			actions: gs.getMessage('us_exp_actions'),
+			open: gs.getMessage('us_exp_open'),
+			download: gs.getMessage('us_exp_download'),
+			downloadAll: gs.getMessage('us_exp_download_all')
+		};
+		
+		const updateSetSysIds = RP.getParameterValue('update_sets');
+		const updateSetGr = new GlideRecordSecure('sys_update_set');
+		if (updateSetSysIds) {
+			updateSetGr.addQuery('sys_id', 'IN', updateSetSysIds);
+		} else {
+			usGr.addQuery('is_default', 'false');
+			usGr.addQuery('state', 'in progress');
+		}
+		
+		usGr.query();
+		
+		const updateSetData = {};
+		while (usGr.next()) {
+			const usSysId = usGr.getUniqueValue();
+			updateSetData[usSysId] = {
+				sys_id: usSysId,
+				name: usGr.getDisplayValue(),
+				app: usGr.getDisplayValue('application'),
+				count: '0'
+			};
+		}
+		
+		const updateGr = new GlideAggregate('sys_update_xml');
+		updateGr.addNotNullQuery('update_set');
+		updateGr.addQuery('update_set', 'IN', Object.keys(updateSetData));
+		updateGr.groupBy('update_set');
+		updateGr.addAggregate('COUNT');
+		updateGr.query();
+		while (updateGr.next()) {
+			const usSysId = updateGr.getValue('update_set');
+			updateSetData[usSysId].count = updateGr.getAggregate('COUNT');
+		}
+
+		const updateSets = Object.values(updateSetData);
+	</g:evaluate>
+	<script>
+		var clientScriptData = {
+			instance_name: '${gs.getProperty("instance_name")}'
+		};
+	</script>
+	<style>
+		table.us-export {
+			width: 100%;
+		}
+		
+		table.us-export td, 
+		table.us-export th {
+			padding-right: 15px;
+		}
+		
+		table.us-export thead tr:first-child,
+		table.us-export tfoot tr:first-child,
+		table.us-export tbody tr:nth-child(even) {
+			background-color: lightgrey;
+		}
+		
+		table.us-export tr:first-child {
+			border-bottom: 1px solid;
+		}
+		
+		table.us-export tfoot {
+			border-top: 1px solid;
+		}
+		
+		#us-export-loader {
+			text-align: center;
+			vertical-align: middle;
+			display: none;
+		}
+		
+		#us-export-error {
+			display: none;
+		}
+	</style>
+	<table class="us-export">
+		<thead>
+			<tr>
+				<th>${labels.application}</th>
+				<th>${labels.name}</th>
+				<th>${labels.updateCount}</th>
+				<th>${labels.actions}</th>
+			</tr>
+		</thead>
+		<tbody>
+			<j:forEach var="jvar_us" items="${updateSets}">
+				<tr data-sys_id="${jvar_us.sys_id}">
+					<td>${jvar_us.app}</td>
+					<td>${jvar_us.name}</td>
+					<td>${jvar_us.count}</td>
+					<td>
+						<a class="icon icon-open-document-new-tab"
+							href="/sys_update_set.do?sys_id=${jvar_us.sys_id}"
+							target="_blank">${labels.open}</a>
+						<a class="icon icon-download"
+							onclick="downloadUS(this.parentNode.parentNode)"
+							href="javascript:void(0);">${labels.download}</a>
+					</td>
+				</tr>
+			</j:forEach>
+		</tbody>
+		<tfoot>
+			<tr>
+				<td colspan="3"></td>
+				<td><a onclick="downloadAll(this)" href="#">${labels.downloadAll} (ZIP)</a></td>
+			</tr>
+			<td id="us-export-loader" colspan="4">
+				<img src="images/ajax-loader.gif" />
+			</td>
+			<td id="us-export-error" colspan="4">
+			</td>
+		</tfoot>
+	</table>
+</j:jelly>]]></html>
+        <name>batch_export</name>
+        <processing_script/>
+        <sys_class_name>sys_ui_page</sys_class_name>
+        <sys_created_by>admin</sys_created_by>
+        <sys_created_on>2023-11-11 10:50:22</sys_created_on>
+        <sys_id>f117473797dab1103c2d3f56f053afb4</sys_id>
+        <sys_mod_count>25</sys_mod_count>
+        <sys_name>batch_export</sys_name>
+        <sys_package display_value="Update Set Export" source="x_376096_us_exp">febd5633971ab1103c2d3f56f053af79</sys_package>
+        <sys_policy/>
+        <sys_scope display_value="Update Set Export">febd5633971ab1103c2d3f56f053af79</sys_scope>
+        <sys_update_name>sys_ui_page_f117473797dab1103c2d3f56f053afb4</sys_update_name>
+        <sys_updated_by>admin</sys_updated_by>
+        <sys_updated_on>2023-11-11 13:23:45</sys_updated_on>
+    </sys_ui_page>
+</record_update>
