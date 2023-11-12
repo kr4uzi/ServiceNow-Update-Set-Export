@@ -81,7 +81,8 @@ function downloadAll(element) {
 			return zip.generateAsync({ type: 'blob' }).then(function(content) {
 				var a = window.document.createElement('A');
 				a.download = 
-					'Update Set Export - ' +
+					clientScriptData.messages.us_exp_export +
+					' - ' +
 					clientScriptData.instance_name +
 					' ' +
 					new Date().toLocaleDateString()
@@ -142,23 +143,17 @@ function remoteUSDownloadURL(removeUsSysId) {
         <endpoint>x_376096_us_exp_batch_export.do</endpoint>
         <html><![CDATA[<?xml version="1.0" encoding="utf-8" ?>
 <j:jelly trim="false" xmlns:j="jelly:core" xmlns:g="glide" xmlns:j2="null" xmlns:g2="null">
-	<g:requires name="x_424426_devops.jszip.min.js.jsdbx" />
-	<g:evaluate>
-		var usGr = new GlideRecordSecure('sys_update_set');
+	<g:requires name="x_376096_us_exp.jszip.min.js.jsdbx" />
+	<g:evaluate>		
+		const usGr = new GlideRecordSecure('sys_update_set');
 		const labels = {
 			application: usGr.getElement('application').getLabel(),
-			name: usGr.getElement('name').getLabel(),
-			updateCount: gs.getMessage('us_exp_update_count'),
-			actions: gs.getMessage('us_exp_actions'),
-			open: gs.getMessage('us_exp_open'),
-			download: gs.getMessage('us_exp_download'),
-			downloadAll: gs.getMessage('us_exp_download_all')
+			name: usGr.getElement('name').getLabel()
 		};
 		
 		const updateSetSysIds = RP.getParameterValue('update_sets');
-		const updateSetGr = new GlideRecordSecure('sys_update_set');
 		if (updateSetSysIds) {
-			updateSetGr.addQuery('sys_id', 'IN', updateSetSysIds);
+			usGr.addQuery('sys_id', 'IN', updateSetSysIds);
 		} else {
 			usGr.addQuery('is_default', 'false');
 			usGr.addQuery('state', 'in progress');
@@ -189,20 +184,38 @@ function remoteUSDownloadURL(removeUsSysId) {
 		}
 
 		const updateSets = Object.values(updateSetData);
+		const clientScriptData = JSON.stringify({
+			instance_name: gs.getProperty("instance_name"),
+			messages: {
+				us_exp_export: gs.getMessage('us_exp_export')
+			}
+		});
 	</g:evaluate>
 	<script>
-		var clientScriptData = {
-			instance_name: '${gs.getProperty("instance_name")}'
-		};
+		var clientScriptData = JSON.parse('${clientScriptData}');
 	</script>
 	<style>
 		table.us-export {
 			width: 100%;
 		}
 		
+		table.us-export tr {
+			height: 22px;
+		}
+		
 		table.us-export td, 
 		table.us-export th {
 			padding-right: 15px;
+		}
+		
+		table.us-export a {
+			margin-right: 5px;
+		}
+		
+		table.us-export a[disabled] {
+			opacity: .4;
+			cursor: default !important;
+			pointer-events: none;
 		}
 		
 		table.us-export thead tr:first-child,
@@ -234,11 +247,16 @@ function remoteUSDownloadURL(removeUsSysId) {
 			<tr>
 				<th>${labels.application}</th>
 				<th>${labels.name}</th>
-				<th>${labels.updateCount}</th>
-				<th>${labels.actions}</th>
+				<th>${gs.getMessage('us_exp_update_count')}</th>
+				<th>${gs.getMessage('us_exp_actions')}</th>
 			</tr>
 		</thead>
 		<tbody>
+			<j:if test="${updateSets.length == 0}">
+				<tr>
+					<td colspan="4">${gs.getMessage('us_exp_no_update_sets')}</td>
+				</tr>
+			</j:if>
 			<j:forEach var="jvar_us" items="${updateSets}">
 				<tr data-sys_id="${jvar_us.sys_id}">
 					<td>${jvar_us.app}</td>
@@ -247,10 +265,10 @@ function remoteUSDownloadURL(removeUsSysId) {
 					<td>
 						<a class="icon icon-open-document-new-tab"
 							href="/sys_update_set.do?sys_id=${jvar_us.sys_id}"
-							target="_blank">${labels.open}</a>
+							target="_blank">$[SP]${gs.getMessage('us_exp_open')}</a>
 						<a class="icon icon-download"
 							onclick="downloadUS(this.parentNode.parentNode)"
-							href="javascript:void(0);">${labels.download}</a>
+							href="javascript:void(0);">$[SP]${gs.getMessage('us_exp_download')}</a>
 					</td>
 				</tr>
 			</j:forEach>
@@ -258,7 +276,9 @@ function remoteUSDownloadURL(removeUsSysId) {
 		<tfoot>
 			<tr>
 				<td colspan="3"></td>
-				<td><a onclick="downloadAll(this)" href="#">${labels.downloadAll} (ZIP)</a></td>
+				<td><a class="icon icon-document-zip"
+					onclick="downloadAll(this)" href="javascript:void(0);">
+					$[SP]${gs.getMessage('us_exp_download_all')} (ZIP)</a></td>
 			</tr>
 			<td id="us-export-loader" colspan="4">
 				<img src="images/ajax-loader.gif" />
@@ -274,13 +294,13 @@ function remoteUSDownloadURL(removeUsSysId) {
         <sys_created_by>admin</sys_created_by>
         <sys_created_on>2023-11-11 10:50:22</sys_created_on>
         <sys_id>f117473797dab1103c2d3f56f053afb4</sys_id>
-        <sys_mod_count>25</sys_mod_count>
+        <sys_mod_count>46</sys_mod_count>
         <sys_name>batch_export</sys_name>
         <sys_package display_value="Update Set Export" source="x_376096_us_exp">febd5633971ab1103c2d3f56f053af79</sys_package>
         <sys_policy/>
         <sys_scope display_value="Update Set Export">febd5633971ab1103c2d3f56f053af79</sys_scope>
         <sys_update_name>sys_ui_page_f117473797dab1103c2d3f56f053afb4</sys_update_name>
         <sys_updated_by>admin</sys_updated_by>
-        <sys_updated_on>2023-11-11 13:23:45</sys_updated_on>
+        <sys_updated_on>2023-11-12 09:54:38</sys_updated_on>
     </sys_ui_page>
 </record_update>
